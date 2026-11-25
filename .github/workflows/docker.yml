@@ -37,7 +37,12 @@ jobs:
       # on PATH for non-interactive shells, missing pnpm/yarn links, `agy acp`
       # not starting without a TTY, python venv without ensurepip.
       - name: Image config
-        run: docker image inspect agy:smoke --format '{{json .Config.Env}}'
+        run: |
+          docker image inspect agy:smoke --format '{{json .Config.Env}}'
+          echo "== env entrypoint"; docker run --rm --entrypoint env agy:smoke | grep -E '^NODE' || echo none
+          echo "== sh -c"; docker run --rm --entrypoint sh agy:smoke -c 'echo "[${NODE_OPTIONS-UNSET}]"' || true
+          echo "== sh -lc"; docker run --rm --entrypoint sh agy:smoke -lc 'echo "[${NODE_OPTIONS-UNSET}]"' || true
+          echo "== /etc/profile head"; docker run --rm --entrypoint sh agy:smoke -c 'head -30 /etc/profile' || true
 
       - name: Smoke test
         run: |
