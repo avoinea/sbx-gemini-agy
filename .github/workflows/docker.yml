@@ -36,14 +36,6 @@ jobs:
       # Catches the regressions that a successful build hides: ~/.local/bin not
       # on PATH for non-interactive shells, missing pnpm/yarn links, `agy acp`
       # not starting without a TTY, python venv without ensurepip.
-      - name: Image config
-        run: |
-          docker image inspect agy:smoke --format '{{json .Config.Env}}'
-          echo "== env entrypoint"; docker run --rm --entrypoint env agy:smoke | grep -E '^NODE' || echo none
-          echo "== sh -c"; docker run --rm --entrypoint sh agy:smoke -c 'echo "[${NODE_OPTIONS-UNSET}]"' || true
-          echo "== sh -lc"; docker run --rm --entrypoint sh agy:smoke -lc 'echo "[${NODE_OPTIONS-UNSET}]"' || true
-          echo "== /etc/profile head"; docker run --rm --entrypoint sh agy:smoke -c 'head -30 /etc/profile' || true
-
       - name: Smoke test
         run: |
           docker run --rm -e AGY_CLI_DISABLE_AUTO_UPDATE=1 \
@@ -66,9 +58,12 @@ jobs:
               rg --version | head -1
               docker --version
               # T3's Antigravity sign-in needs a warning-free stderr from node.
-              echo "NODE_OPTIONS=[${NODE_OPTIONS-UNSET}]"
+              # The helper is base64 so the single-quoted docker -c script stays
+              # balanced (a literal ' inside it ends the quoting and runs the
+              # rest in the runner shell).
               test -n "${NODE_OPTIONS-}"
-              NODE_USE_ENV_PROXY=1 node -e 'process.stderr.write("x\n")' 2>&1 | grep -qx x
+              NODE_USE_ENV_PROXY=1 node -e "$(printf %s Y29uc29sZS5lcnJvcigieCIp | base64 -d)" 2>/tmp/node.stderr >/dev/null
+              test "$(cat /tmp/node.stderr)" = x
               test -f "$HOME/.gemini/AGENTS.md"
               test -f "$HOME/.gemini/antigravity-cli/skills/grill-me/SKILL.md"
               test -f "$HOME/.gemini/antigravity-cli/skills/handoff/SKILL.md"
