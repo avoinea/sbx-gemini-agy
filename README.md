@@ -1,5 +1,7 @@
 # sbx-gemini-agy
 
+[![Build, smoke test & publish](https://github.com/avoinea/sbx-gemini-agy/actions/workflows/docker.yml/badge.svg)](https://github.com/avoinea/sbx-gemini-agy/actions/workflows/docker.yml)
+
 Docker Sandboxes ([`sbx`](https://docs.docker.com/ai/sandboxes/)) workload for
 [Google Antigravity CLI](https://antigravity.google/docs/getting-started/)
 (`agy`), with the Plone / Volto / T3 Code toolchain from
