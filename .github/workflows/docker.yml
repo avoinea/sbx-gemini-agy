@@ -39,36 +39,8 @@ jobs:
       - name: Smoke test
         run: |
           docker run --rm -e AGY_CLI_DISABLE_AUTO_UPDATE=1 \
-            --entrypoint sh agy:smoke -lc '
-              set -eux
-              agy --version
-              agy --help > /dev/null
-              printf "%s\n" "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":1,\"clientCapabilities\":{}}}" \
-                | timeout 60 agy acp | grep -q "Antigravity ACP Server"
-              t3 --version
-              node --version
-              pnpm --version
-              yarn --version
-              uv --version
-              uvx --version
-              python --version
-              python -m venv /tmp/venv-check
-              /tmp/venv-check/bin/pip --version
-              git --version
-              rg --version | head -1
-              docker --version
-              # T3's Antigravity sign-in needs a warning-free stderr from node.
-              # The helper is base64 so the single-quoted docker -c script stays
-              # balanced (a literal ' inside it ends the quoting and runs the
-              # rest in the runner shell).
-              test -n "${NODE_OPTIONS-}"
-              NODE_USE_ENV_PROXY=1 node -e "$(printf %s Y29uc29sZS5lcnJvcigieCIp | base64 -d)" 2>/tmp/node.stderr >/dev/null
-              test "$(cat /tmp/node.stderr)" = x
-              test -f "$HOME/.gemini/AGENTS.md"
-              test -f "$HOME/.gemini/antigravity-cli/skills/grill-me/SKILL.md"
-              test -f "$HOME/.gemini/antigravity-cli/skills/handoff/SKILL.md"
-              test -f "$HOME/.gemini/antigravity-cli/skills/review/SKILL.md"
-            '
+            -v "$PWD/scripts:/scripts:ro" \
+            --entrypoint sh agy:smoke /scripts/smoke.sh
 
   publish:
     name: Publish (linux/amd64 + linux/arm64)
