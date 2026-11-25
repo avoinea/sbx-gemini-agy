@@ -53,6 +53,10 @@ capabilities:
           - api.github.com:443
           - raw.githubusercontent.com:443
           - objects.githubusercontent.com:443
+          - release-assets.githubusercontent.com:443
+          # T3 Code: runtime downloads come from GitHub releases; the client
+          # checks this host for updates.
+          - t3.codes:443
 
   # Optional: without a host binding, agy falls back to its interactive
   # copy/paste OAuth login instead of the proxy-managed session.

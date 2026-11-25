@@ -122,14 +122,25 @@ it needs is in the image.
    `agy-eea-website.sbx`, project directory = the same absolute path you passed
    to `sbx run` (`/Users/you/sandbox/eea-website`).
 
-4. **Settings → Providers → Antigravity**: set **Binary path** to
-   `/home/agent/.local/bin/agy` (do not let T3 download its own managed
-   runtime), then **Sign in**. T3 prints the Google URL and takes the code back
-   in the client.
+4. **Settings → Providers → Add provider → Antigravity**, on that environment.
+   Set **Binary path** to `/home/agent/.local/bin/agy` — leaving it blank makes
+   T3 download its own managed runtime (~1.25 GiB) instead of using the agy in
+   the image. Then **Sign in**: T3 shows the Google URL and takes the code back
+   in the client (same copy/paste flow as the terminal).
 
 T3 keeps its Antigravity credentials in its own store; the sbx credential proxy
-applies to its token exchange too. If a provider update check is blocked, allow
-`t3.codes` in the policy.
+applies to its token exchange too. The first SSH connection downloads the T3
+server into `~/.t3/runtime/versions/` — that is why
+`release-assets.githubusercontent.com` is on the allowlist. T3 needs
+Antigravity 1.5+ (the image ships a newer one) and `t3 --version` here is
+`0.1.12`, comfortably above the minimum.
+
+If a sandbox was created before this allowlist changed, recreate it or add the
+rule to the existing one:
+
+```bash
+sbx policy allow network "release-assets.githubusercontent.com:443" --sandbox agy-myproject
+```
 
 ## Network policy
 
@@ -145,7 +156,9 @@ Egress is an allowlist declared in [`agy.yaml`](./agy.yaml):
 - **Dev registries**: `registry.npmjs.org`, `registry.yarnpkg.com`,
   `pypi.org`, `files.pythonhosted.org`, `eggrepo.eea.europa.eu`, `nodejs.org`,
   `github.com`, `codeload.github.com`, `api.github.com`,
-  `raw.githubusercontent.com`, `objects.githubusercontent.com`.
+  `raw.githubusercontent.com`, `objects.githubusercontent.com`,
+  `release-assets.githubusercontent.com` (GitHub release assets — this is where
+  T3 Code downloads its server on first connect), and `t3.codes`.
 
 To add a domain, fork the repo and extend the `network-policy@1` capability, or
 override it on the host:
