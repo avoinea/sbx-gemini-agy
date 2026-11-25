@@ -1,0 +1,120 @@
+name: Build, smoke test & publish
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+env:
+  DOCKERHUB_IMAGE: avoinea/agy
+  GHCR_IMAGE: ghcr.io/${{ github.repository_owner }}/agy
+
+jobs:
+  smoke:
+    name: Build & smoke test (linux/amd64)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build workload image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: agy.yaml
+          platforms: linux/amd64
+          load: true
+          tags: agy:smoke
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Catches the regressions that a successful build hides: ~/.local/bin not
+      # on PATH for non-interactive shells, missing pnpm/yarn links, `agy acp`
+      # not starting without a TTY, python venv without ensurepip.
+      - name: Smoke test
+        run: |
+          docker run --rm -e AGY_CLI_DISABLE_AUTO_UPDATE=1 \
+            --entrypoint sh agy:smoke -lc '
+              set -eux
+              agy --version
+              agy --help > /dev/null
+              printf "%s\n" "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":1,\"clientCapabilities\":{}}}" \
+                | timeout 60 agy acp | grep -q "Antigravity ACP Server"
+              t3 --version
+              node --version
+              pnpm --version
+              yarn --version
+              uv --version
+              uvx --version
+              python --version
+              python -m venv /tmp/venv-check
+              /tmp/venv-check/bin/pip --version
+              git --version
+              rg --version | head -1
+              docker --version
+              test -f "$HOME/.gemini/AGENTS.md"
+              test -f "$HOME/.gemini/antigravity-cli/skills/grill-me/SKILL.md"
+              test -f "$HOME/.gemini/antigravity-cli/skills/handoff/SKILL.md"
+              test -f "$HOME/.gemini/antigravity-cli/skills/review/SKILL.md"
+            '
+
+  publish:
+    name: Publish (linux/amd64 + linux/arm64)
+    needs: smoke
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ env.DOCKERHUB_IMAGE }}
+            ${{ env.GHCR_IMAGE }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix=sha-
+
+      - name: Build & push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: agy.yaml
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

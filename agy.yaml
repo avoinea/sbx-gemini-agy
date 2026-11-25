@@ -1,0 +1,132 @@
+# syntax=docker/sandbox-kit:3
+# Antigravity CLI (agy) as a v3 workload: the image carries the agent and the
+# dev toolchain, the capabilities declare what the host is allowed to grant.
+schemaVersion: "3"
+kind: workload
+
+displayName: Antigravity CLI (agy) — Plone / Node / Python
+description: >-
+  Google's Antigravity CLI in YOLO mode, inside a Docker Sandbox, with the
+  Plone, Node (22/24, pnpm, yarn), Python (uv) and T3 Code toolchain.
+  Sign in once: the host credential proxy keeps the Google tokens outside the
+  sandbox.
+version: "0.1.0"
+sourceUrl: https://github.com/avoinea/sbx-gemini-agy
+licenses: [MIT]
+
+capabilities:
+  # This is an agent sandbox: sbx launches agy using the entrypoint in the image.
+  - type: com.docker.sandbox/sbx@1
+
+  - type: com.docker.sandbox/network-policy@1
+    config:
+      runtime:
+        allow:
+          # Antigravity CLI: installer, feature flags, release channel.
+          - antigravity.google:443
+          - antigravity-unleash.goog:443
+          - antigravity-cli-auto-updater-974169037036.us-central1.run.app:443
+          - storage.googleapis.com:443
+          # Google OAuth and profile assets.
+          - accounts.google.com:443
+          - lh3.googleusercontent.com:443
+          - oauth2.googleapis.com:443
+          - play.googleapis.com:443
+          - www.googleapis.com:443
+          # Antigravity / Gemini Code Assist model and agent APIs.
+          - businessaicode.googleapis.com:443
+          - aiplatform.googleapis.com:443
+          - aicode.googleapis.com:443
+          - cloudaicompanion.googleapis.com:443
+          - cloudcode-pa.googleapis.com:443
+          - daily-cloudcode-pa.googleapis.com:443
+          - generativelanguage.googleapis.com:443
+          # Dev registries: this sandbox exists to install packages.
+          - registry.npmjs.org:443
+          - registry.yarnpkg.com:443
+          - nodejs.org:443
+          - pypi.org:443
+          - files.pythonhosted.org:443
+          - eggrepo.eea.europa.eu:443
+          - github.com:443
+          - codeload.github.com:443
+          - api.github.com:443
+          - raw.githubusercontent.com:443
+          - objects.githubusercontent.com:443
+
+  # Optional: without a host binding, agy falls back to its interactive
+  # copy/paste OAuth login instead of the proxy-managed session.
+  - type: com.docker.sandbox/credential@1
+    optional: true
+    description: Google OAuth session used by the Antigravity CLI
+    config:
+      service: antigravity
+      phase: runtime
+      oauth:
+        tokenEndpoint:
+          host: oauth2.googleapis.com
+          path: /token
+        resourceHosts:
+          - businessaicode.googleapis.com
+          - aiplatform.googleapis.com
+          - play.googleapis.com
+          - aicode.googleapis.com
+          - cloudaicompanion.googleapis.com
+          - cloudcode-pa.googleapis.com
+          - daily-cloudcode-pa.googleapis.com
+          - generativelanguage.googleapis.com
+          - www.googleapis.com
+        sentinels:
+          accessToken: agy-oauth-access-proxy-managed
+          refreshToken: agy-oauth-refresh-proxy-managed
+        # agy reads its session from this file. It holds the sentinels, never
+        # the real tokens: those stay in the host credential store.
+        credentialFile:
+          path: ~/.gemini/antigravity-cli/antigravity-oauth-token
+          structure:
+            token:
+              access_token: "{{.AccessToken}}"
+              token_type: Bearer
+              refresh_token: "{{.RefreshToken}}"
+              expiry: "9999-12-31T23:59:59Z"
+            auth_method: consumer
+
+  - type: com.docker.sandbox/lifecycle@1
+    config:
+      install:
+        # Seed a permissive configuration so the first run does not stop for
+        # onboarding. Only written when missing: later user changes survive.
+        - description: Seed Antigravity settings for sandboxed operation
+          user: agent
+          env: [WORKSPACE_DIR]
+          command: |
+            set -eu
+            dir="$HOME/.gemini/antigravity-cli"
+            file="$dir/settings.json"
+            [ ! -e "$file" ] || exit 0
+            mkdir -p "$dir"
+            ws="${WORKSPACE_DIR:-/workspace}"
+            esc=$(printf '%s' "$ws" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\t/\\t/g')
+            cat > "$file" <<EOF
+            {
+              "model": "Gemini 4 Neon (XHigh)",
+              "colorScheme": "tokyo night",
+              "altScreenMode": "always",
+              "agentMode": "accept-edits",
+              "toolPermission": "always-proceed",
+              "artifactReviewPolicy": "always-proceed",
+              "allowNonWorkspaceAccess": true,
+              "permissions": {
+                "allow": [
+                  "command(*)",
+                  "execute_url(*)",
+                  "mcp(*)",
+                  "read_file(*)",
+                  "read_url(*)",
+                  "write_file(*)"
+                ]
+              },
+              "trustedWorkspaces": ["$esc"]
+            }
+            EOF
+            chmod 0600 "$file"
