@@ -32,6 +32,14 @@ RUN python --version \
 # The base image ships uv without its uvx shim.
 RUN ln -sf /usr/local/bin/uv /usr/local/bin/uvx && uvx --version
 
+# sbx injects NODE_USE_ENV_PROXY=1 so Node honours the sandbox proxy. Node then
+# prints an EnvHttpProxyAgent experimental warning on stderr, and T3 Code's
+# Antigravity sign-in spawns `node -e <helper>` while requiring stderr to be
+# exactly one marker line — the warning breaks it with the opaque error
+# "Antigravity browser suppression could not be verified". Suppress that one
+# warning code (NODE_NO_WARNINGS=1 is the bigger hammer if this regresses).
+ENV NODE_OPTIONS=--disable-warning=UNDICI-EHPA
+
 # Point ~/workspace at the mounted workspace. sbx mounts the host directory at
 # its own absolute path, so tools that default to ~/workspace (T3 Code, VS Code)
 # would otherwise open an empty folder.

@@ -57,6 +57,9 @@ jobs:
               git --version
               rg --version | head -1
               docker --version
+              # T3's Antigravity sign-in needs a warning-free stderr from node.
+              test -n "$NODE_OPTIONS"
+              NODE_USE_ENV_PROXY=1 node -e 'process.stderr.write("x\\n")' 2>&1 | grep -qx x
               test -f "$HOME/.gemini/AGENTS.md"
               test -f "$HOME/.gemini/antigravity-cli/skills/grill-me/SKILL.md"
               test -f "$HOME/.gemini/antigravity-cli/skills/handoff/SKILL.md"

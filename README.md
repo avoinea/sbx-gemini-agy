@@ -135,6 +135,13 @@ server into `~/.t3/runtime/versions/` — that is why
 Antigravity 1.5+ (the image ships a newer one) and `t3 --version` here is
 `0.1.12`, comfortably above the minimum.
 
+**Sign-in fails with “Antigravity browser suppression could not be verified”?**
+That is not OAuth: `sbx` injects `NODE_USE_ENV_PROXY=1`, Node prints an
+`EnvHttpProxyAgent` experimental warning on stderr, and T3's sign-in preflight
+requires stderr to be exactly one marker line. The image sets
+`NODE_OPTIONS=--disable-warning=UNDICI-EHPA` for that reason; if a newer Node
+introduces another warning, use `NODE_NO_WARNINGS=1` instead.
+
 If a sandbox was created before this allowlist changed, recreate it or add the
 rule to the existing one:
 
